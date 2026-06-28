@@ -20,14 +20,22 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Grant Execute Permission to Gradle Wrapper
-        run: chmod +x android/gradlew
-
-      - name: Build Debug APK
-        run: ./android/gradlew assembleDebug --project-dir android
+      - name: Find and Run Gradle Build
+        run: |
+          GRADLEW_PATH=$(find . -name "gradlew" -print -quit)
+          if [ -z "$GRADLEW_PATH" ]; then
+            echo "Error: gradlew file not found anywhere in the repository!"
+            exit 1
+          fi
+          echo "Found gradlew at: $GRADLEW_PATH"
+          chmod +x "$GRADLEW_PATH"
+          
+          GRADLE_DIR=$(dirname "$GRADLEW_PATH")
+          "$GRADLEW_PATH" assembleDebug --project-dir "$GRADLE_DIR"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Stencilla-Debug-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            **/build/outputs/apk/debug/*.apk
