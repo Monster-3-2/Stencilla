@@ -20,18 +20,10 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Find and Run Gradle Build
+      - name: Build Debug APK with Global Gradle
         run: |
-          GRADLEW_PATH=$(find . -name "gradlew" -print -quit)
-          if [ -z "$GRADLEW_PATH" ]; then
-            echo "Error: gradlew file not found anywhere in the repository!"
-            exit 1
-          fi
-          echo "Found gradlew at: $GRADLEW_PATH"
-          chmod +x "$GRADLEW_PATH"
-          
-          GRADLE_DIR=$(dirname "$GRADLEW_PATH")
-          "$GRADLEW_PATH" assembleDebug --project-dir "$GRADLE_DIR"
+          cd android
+          gradle assembleDebug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
