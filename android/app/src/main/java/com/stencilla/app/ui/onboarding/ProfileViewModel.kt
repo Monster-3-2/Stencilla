@@ -23,6 +23,14 @@ data class ProfileUiState(
     val bodyType: String? = null,
     val skinTone: String? = null,
     val styleGoal: String? = null,
+    val preferredColors: String = "",
+    val preferredFits: String? = null,
+    val preferredSilhouettes: String? = null,
+    val comfortPriority: String? = null,
+    val formalityPreference: String? = null,
+    val modestyPreference: String? = null,
+    val styleInspirations: String = "",
+    val confidenceSignals: String = "",
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
     val errorMessage: String? = null,
@@ -46,7 +54,7 @@ class ProfileViewModel @Inject constructor(
     private fun load() {
         viewModelScope.launch {
             try {
-                val profile = profileRepository.getProfile()
+                val profile = profileRepository.getProfile().getOrNull() ?: return@launch
                 _uiState.update {
                     it.copy(
                         fullName = profile.fullName.orEmpty(),
@@ -57,6 +65,10 @@ class ProfileViewModel @Inject constructor(
                         bodyType = profile.bodyType,
                         skinTone = profile.skinTone,
                         styleGoal = profile.styleGoal,
+                        preferredColors = profile.preferredColors.orEmpty(), preferredFits = profile.preferredFits,
+                        preferredSilhouettes = profile.preferredSilhouettes, comfortPriority = profile.comfortPriority,
+                        formalityPreference = profile.formalityPreference, modestyPreference = profile.modestyPreference,
+                        styleInspirations = profile.styleInspirations.orEmpty(), confidenceSignals = profile.confidenceSignals.orEmpty(),
                         isLoading = false,
                     )
                 }
@@ -74,13 +86,21 @@ class ProfileViewModel @Inject constructor(
     fun onBodyTypeSelect(v: String) = _uiState.update { it.copy(bodyType = v) }
     fun onSkinToneSelect(v: String) = _uiState.update { it.copy(skinTone = v) }
     fun onStyleGoalSelect(v: String) = _uiState.update { it.copy(styleGoal = v) }
+    fun onPreferredColorsChange(v: String) = _uiState.update { it.copy(preferredColors = v) }
+    fun onPreferredFitsSelect(v: String) = _uiState.update { it.copy(preferredFits = v) }
+    fun onPreferredSilhouettesSelect(v: String) = _uiState.update { it.copy(preferredSilhouettes = v) }
+    fun onComfortPrioritySelect(v: String) = _uiState.update { it.copy(comfortPriority = v) }
+    fun onFormalityPreferenceSelect(v: String) = _uiState.update { it.copy(formalityPreference = v) }
+    fun onModestyPreferenceSelect(v: String) = _uiState.update { it.copy(modestyPreference = v) }
+    fun onStyleInspirationsChange(v: String) = _uiState.update { it.copy(styleInspirations = v) }
+    fun onConfidenceSignalsChange(v: String) = _uiState.update { it.copy(confidenceSignals = v) }
 
     fun save() {
         val s = _uiState.value
         _uiState.update { it.copy(isSaving = true, errorMessage = null) }
         viewModelScope.launch {
             try {
-                profileRepository.updateProfile(
+                profileRepository.saveProfile(
                     ProfileUpdateRequest(
                         fullName = s.fullName.ifBlank { null },
                         age = s.age.toIntOrNull(),
@@ -90,6 +110,10 @@ class ProfileViewModel @Inject constructor(
                         bodyType = s.bodyType,
                         skinTone = s.skinTone,
                         styleGoal = s.styleGoal,
+                        preferredColors = s.preferredColors.trim().takeIf { it.isNotEmpty() }, preferredFits = s.preferredFits,
+                        preferredSilhouettes = s.preferredSilhouettes, comfortPriority = s.comfortPriority,
+                        formalityPreference = s.formalityPreference, modestyPreference = s.modestyPreference,
+                        styleInspirations = s.styleInspirations.trim().takeIf { it.isNotEmpty() }, confidenceSignals = s.confidenceSignals.trim().takeIf { it.isNotEmpty() },
                     ),
                 )
                 _uiState.update { it.copy(isSaving = false, saved = true) }

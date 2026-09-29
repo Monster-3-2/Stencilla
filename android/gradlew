@@ -1,0 +1,14 @@
+#!/bin/sh
+##
+# Gradle wrapper shell script for Unix-like systems
+##
+APP_NAME="Gradle"
+DIRNAME=$(dirname "$0")
+APP_HOME=$(cd "$DIRNAME" && pwd)
+GRADLE_USER_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
+WRAPPER_JAR="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
+WRAPPER_PROPERTIES="$APP_HOME/gradle/wrapper/gradle-wrapper.properties"
+exec java \
+  -classpath "$WRAPPER_JAR" \
+  "-Dgradle.user.home=$GRADLE_USER_HOME" \
+  org.gradle.wrapper.GradleWrapperMain "$@"

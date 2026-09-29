@@ -41,6 +41,7 @@ import com.stencilla.app.ui.components.ChipSelector
 fun ProfileScreen(
     onBack: () -> Unit,
     onSaved: () -> Unit,
+    onBackup: () -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -113,6 +114,16 @@ fun ProfileScreen(
             ChipSelector("Skin tone", StyleOptions.skinTones, state.skinTone, viewModel::onSkinToneSelect)
             ChipSelector("Style goal", StyleOptions.styleGoals, state.styleGoal, viewModel::onStyleGoalSelect)
 
+            Text("Personal style", style = MaterialTheme.typography.titleMedium)
+            OutlinedTextField(value = state.preferredColors, onValueChange = viewModel::onPreferredColorsChange, label = { Text("Preferred colors (e.g. navy, cream, olive)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            ChipSelector("Preferred fit", StyleOptions.preferredFits, state.preferredFits, viewModel::onPreferredFitsSelect)
+            ChipSelector("Silhouette", StyleOptions.silhouettes, state.preferredSilhouettes, viewModel::onPreferredSilhouettesSelect)
+            ChipSelector("Comfort", StyleOptions.comfortPriorities, state.comfortPriority, viewModel::onComfortPrioritySelect)
+            ChipSelector("Formality", StyleOptions.formalityPreferences, state.formalityPreference, viewModel::onFormalityPreferenceSelect)
+            ChipSelector("Coverage", StyleOptions.modestyPreferences, state.modestyPreference, viewModel::onModestyPreferenceSelect)
+            OutlinedTextField(value = state.styleInspirations, onValueChange = viewModel::onStyleInspirationsChange, label = { Text("Style inspirations") }, supportingText = { Text("People, brands, eras, or references you like") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+            OutlinedTextField(value = state.confidenceSignals, onValueChange = viewModel::onConfidenceSignalsChange, label = { Text("What makes you feel confident?") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+
             state.errorMessage?.let {
                 Text(text = it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
             }
@@ -137,6 +148,8 @@ fun ProfileScreen(
             ) {
                 Text("Log out")
             }
+
+            OutlinedButton(onClick = onBackup, modifier = Modifier.fillMaxWidth()) { Text("Encrypted backup and restore") }
 
             Spacer(modifier = Modifier.height(24.dp))
         }

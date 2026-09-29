@@ -14,6 +14,9 @@ interface ClothingItemDao {
     @Query("SELECT * FROM clothing_items ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<ClothingItemEntity>>
 
+    @Query("SELECT * FROM clothing_items ORDER BY createdAt DESC")
+    suspend fun getAll(): List<ClothingItemEntity>
+
     @Query("SELECT * FROM clothing_items WHERE category = :category ORDER BY createdAt DESC")
     fun observeByCategory(category: String): Flow<List<ClothingItemEntity>>
 
@@ -28,6 +31,15 @@ interface ClothingItemDao {
 
     @Query("SELECT * FROM clothing_items WHERE id = :id")
     suspend fun getById(id: String): ClothingItemEntity?
+
+    @Query("UPDATE clothing_items SET wearCount = wearCount + 1, lastWornAt = :wornAt WHERE id = :id")
+    suspend fun recordWear(id: String, wornAt: Long)
+
+    @Query("UPDATE clothing_items SET isFavorite = :favorite WHERE id = :id")
+    suspend fun setFavorite(id: String, favorite: Boolean)
+
+    @Query("SELECT * FROM clothing_items ORDER BY wearCount ASC, lastWornAt ASC")
+    suspend fun getAllForAnalytics(): List<ClothingItemEntity>
 
     @Delete
     suspend fun delete(item: ClothingItemEntity)

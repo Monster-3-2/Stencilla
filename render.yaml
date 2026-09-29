@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: stencilla-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    rootDir: .
+    plan: free
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: TURSO_DATABASE_URL
+        sync: false   # set manually in Render dashboard
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_VISION_MODEL
+        value: meta-llama/llama-4-scout-17b-16e-instruct
+      - key: GROQ_TEXT_MODEL
+        value: llama-3.3-70b-versatile
+    healthCheckPath: /health

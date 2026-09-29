@@ -1,97 +1,106 @@
 package com.stencilla.app.ui.navigation
 
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import com.stencilla.app.RootViewModel
-import com.stencilla.app.ui.auth.AuthScreen
-import com.stencilla.app.ui.avatar.AvatarScreen
-import com.stencilla.app.ui.closet.AddItemScreen
-import com.stencilla.app.ui.closet.ClosetScreen
-import com.stencilla.app.ui.onboarding.ProfileScreen
-import com.stencilla.app.ui.outfit.OutfitScreen
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import com.stencilla.app.RootViewModel
+import com.stencilla.app.ui.auth.AuthScreen
+import com.stencilla.app.ui.closet.AddItemScreen
+import com.stencilla.app.ui.closet.ClosetScreen
+import com.stencilla.app.ui.onboarding.ProfileSetupScreen
+import com.stencilla.app.ui.planner.PlannerScreen
+import com.stencilla.app.ui.profile.ProfileScreen
+import com.stencilla.app.ui.settings.SettingsScreen
+import com.stencilla.app.ui.stylenotes.StyleNotesScreen
+import com.stencilla.app.ui.today.TodayScreen
+import com.stencilla.app.ui.verifier.OutfitVerifierScreen
 
 @Composable
-fun StencillaNavGraph(navController: NavHostController = rememberNavController()) {
-    val rootViewModel: RootViewModel = hiltViewModel()
-    val isLoggedIn by rootViewModel.isLoggedIn.collectAsState()
+fun StencillaNavGraph(navController: NavHostController) {
+    val rootVm: RootViewModel = hiltViewModel()
+    val isLoggedIn by rootVm.isLoggedIn.collectAsState(initial = null)
 
-    if (isLoggedIn == null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
-        return
-    }
+    if (isLoggedIn == null) return  // Splash — wait for DataStore to emit
 
-    // Whenever auth state flips to false (e.g. logout), snap back to the auth screen.
-    LaunchedEffect(isLoggedIn) {
-        if (isLoggedIn == false && navController.currentDestination?.route != Routes.AUTH) {
-            navController.navigate(Routes.AUTH) {
-                popUpTo(navController.graph.id) { inclusive = true }
-            }
-        }
-    }
+    val startDest = if (isLoggedIn == true) Routes.TODAY else Routes.AUTH
 
-    NavHost(
-        navController = navController,
-        startDestination = if (isLoggedIn == true) Routes.CLOSET else Routes.AUTH,
-    ) {
+    NavHost(navController = navController, startDestination = startDest) {
+
         composable(Routes.AUTH) {
             AuthScreen(
-                onAuthenticated = {
-                    navController.navigate(Routes.CLOSET) {
-                        popUpTo(navController.graph.id) { inclusive = true }
+                onAuthSuccess = {
+                    navController.navigate(Routes.ONBOARDING) {
+                        popUpTo(Routes.AUTH) { inclusive = true }
                     }
-                },
+                }
+            )
+        }
+
+        composable(Routes.ONBOARDING) {
+            ProfileSetupScreen(
+                onComplete = {
+                    navController.navigate(Routes.TODAY) {
+                        popUpTo(Routes.ONBOARDING) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Routes.TODAY) {
+            TodayScreen(
+                onNavigateToStyleNotes = { navController.navigate(Routes.STYLE_NOTES) },
+                onNavigateToVerifier  = { navController.navigate(Routes.VERIFIER) },
             )
         }
 
         composable(Routes.CLOSET) {
             ClosetScreen(
-                onNavigate = { route -> navController.navigateBottomTab(route) },
                 onAddItem = { navController.navigate(Routes.ADD_ITEM) },
+            )
+        }
+
+        composable(Routes.PLANNER) {
+            PlannerScreen()
+        }
+
+        composable(Routes.PROFILE) {
+            ProfileScreen(
+                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
             )
         }
 
         composable(Routes.ADD_ITEM) {
             AddItemScreen(
-                onBack = { navController.popBackStack() },
+                onBack    = { navController.popBackStack() },
                 onUploaded = { navController.popBackStack() },
             )
         }
 
-        composable(Routes.OUTFIT) {
-            OutfitScreen(onNavigate = { route -> navController.navigateBottomTab(route) })
-        }
-
-        composable(Routes.AVATAR) {
-            AvatarScreen(onNavigate = { route -> navController.navigateBottomTab(route) })
-        }
-
-        composable(Routes.PROFILE) {
-            ProfileScreen(
+        composable(Routes.VERIFIER) {
+            OutfitVerifierScreen(
                 onBack = { navController.popBackStack() },
-                onSaved = { navController.popBackStack() },
             )
         }
-    }
-}
 
-private fun NavHostController.navigateBottomTab(route: String) {
-    navigate(route) {
-        popUpTo(Routes.CLOSET) { inclusive = false; saveState = true }
-        launchSingleTop = true
-        restoreState = true
+        composable(Routes.STYLE_NOTES) {
+            StyleNotesScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.SETTINGS) {
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onLogout = {
+                    navController.navigate(Routes.AUTH) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
+            )
+        }
     }
 }

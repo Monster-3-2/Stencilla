@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Stencilla</string>
+    <string name="tab_today">Today</string>
+    <string name="tab_closet">Closet</string>
+    <string name="tab_planner">Planner</string>
+    <string name="tab_profile">Profile</string>
 </resources>

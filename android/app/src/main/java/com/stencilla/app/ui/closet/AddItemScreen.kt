@@ -25,6 +25,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -40,6 +41,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.stencilla.app.util.ImageFileUtil
+import com.stencilla.app.ui.components.ChipOption
+import com.stencilla.app.ui.components.ChipSelector
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,6 +101,54 @@ fun AddItemScreen(
                         .fillMaxWidth()
                         .aspectRatio(1f)
                         .clip(RoundedCornerShape(16.dp)),
+                )
+
+                Text("Item details", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = state.brand,
+                    onValueChange = viewModel::onBrandChange,
+                    label = { Text("Brand (optional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = state.size,
+                    onValueChange = viewModel::onSizeChange,
+                    label = { Text("Size (optional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                ChipSelector(
+                    title = "Condition",
+                    options = listOf("new", "good", "worn", "needs_repair").map { ChipOption(it, it.replace('_', ' ').replaceFirstChar { c -> c.uppercase() }) },
+                    selected = state.condition,
+                    onSelect = viewModel::onConditionChange,
+                )
+                ChipSelector(
+                    title = "Availability",
+                    options = listOf("available", "unavailable", "lent_out").map { ChipOption(it, it.replace('_', ' ').replaceFirstChar { c -> c.uppercase() }) },
+                    selected = state.availability,
+                    onSelect = viewModel::onAvailabilityChange,
+                )
+                ChipSelector(
+                    title = "Laundry state",
+                    options = listOf("clean", "to_wash", "drying", "stored").map { ChipOption(it, it.replace('_', ' ').replaceFirstChar { c -> c.uppercase() }) },
+                    selected = state.laundryState,
+                    onSelect = viewModel::onLaundryStateChange,
+                )
+                OutlinedTextField(
+                    value = state.repairNote,
+                    onValueChange = viewModel::onRepairNoteChange,
+                    label = { Text("Repair / alteration note (optional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                )
+                OutlinedTextField(
+                    value = state.purchasePrice,
+                    onValueChange = viewModel::onPurchasePriceChange,
+                    label = { Text("Purchase price (optional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
                 )
 
                 state.errorMessage?.let {

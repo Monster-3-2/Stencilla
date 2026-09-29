@@ -2,96 +2,148 @@ package com.stencilla.app.ui.closet
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.stencilla.app.data.local.db.ClothingItemDao
 import com.stencilla.app.data.local.db.ClothingItemEntity
-import com.stencilla.app.data.repository.WardrobeRepository
-import com.stencilla.app.util.ApiErrorParser
+import com.stencilla.app.data.remote.dto.CategoryCountDto
+import com.stencilla.app.data.remote.dto.ColorEntryDto
+import com.stencilla.app.data.remote.dto.SmartCategoryDto
+import com.stencilla.app.data.repository.WardrobeAnalyticsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-val CLOSET_TABS = listOf(
-    "All", "Shirts", "T-Shirts", "Jackets", "Coats",
-    "Jeans", "Trousers", "Shorts", "Shoes", "Accessories",
-)
-
-private fun tabToCategory(tab: String): String? = when (tab) {
-    "All" -> null
-    "Shirts" -> "shirt"
-    "T-Shirts" -> "tshirt"
-    "Jackets" -> "jacket"
-    "Coats" -> "coat"
-    "Jeans" -> "jeans"
-    "Trousers" -> "trousers"
-    "Shorts" -> "shorts"
-    "Shoes" -> "shoes"
-    "Accessories" -> "accessory"
-    else -> null
-}
-
 data class ClosetUiState(
-    val selectedTab: String = "All",
-    val pendingClarificationItem: ClothingItemEntity? = null,
-    val errorMessage: String? = null,
+    val allItems: List<ClothingItemEntity> = emptyList(),
+    val filteredItems: List<ClothingItemEntity> = emptyList(),
+    val searchQuery: String = "",
+    val activeFilter: String = "All",
+    val totalCount: Int = 0,
+    val outfitCount: Int = 0,
+    val utilizationPct: Int = 0,
+    val topColors: List<ColorEntryDto> = emptyList(),
+    val categoryBreakdown: List<CategoryCountDto> = emptyList(),
+    val smartCategories: List<SmartCategoryDto> = emptyList(),
+    val aiSuggestion: String? = null,
+    val isLoadingItems: Boolean = false,
+    val snackMessage: String? = null,
 )
 
 @HiltViewModel
 class ClosetViewModel @Inject constructor(
-    private val wardrobeRepository: WardrobeRepository,
+    private val clothingDao: ClothingItemDao,
+    private val analyticsRepo: WardrobeAnalyticsRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ClosetUiState())
     val uiState: StateFlow<ClosetUiState> = _uiState.asStateFlow()
 
-    private val _allItems: StateFlow<List<ClothingItemEntity>> = wardrobeRepository.observeItems()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val items: StateFlow<List<ClothingItemEntity>> = _uiState
-        .map { state ->
-            val category = tabToCategory(state.selectedTab)
-            if (category == null) _allItems.value
-            else _allItems.value.filter { it.category == category }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private var searchJob: Job? = null
 
     init {
-        // Watch for items needing clarification and surface the dialog
         viewModelScope.launch {
-            _allItems.collect { list ->
-                val pending = list.firstOrNull { it.needsClarification && it.clarificationQuestion != null }
-                _uiState.update { it.copy(pendingClarificationItem = pending) }
-                // Re-filter when allItems changes
-                val category = tabToCategory(_uiState.value.selectedTab)
-                val filtered = if (category == null) list else list.filter { item -> item.category == category }
-                // StateFlow will recompute via the map above on next collect
+            clothingDao.observeAll().collect { items ->
+                _uiState.update { it.copy(allItems = items, totalCount = items.size) }
+                applyFilterAndSearch()
             }
         }
+        refreshAnalytics()
     }
 
-    fun selectTab(tab: String) = _uiState.update { it.copy(selectedTab = tab) }
-
-    fun deleteItem(item: ClothingItemEntity) {
+    fun refreshAnalytics() {
         viewModelScope.launch {
             try {
-                wardrobeRepository.deleteItem(item)
-            } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = ApiErrorParser.messageFor(e)) }
+                val analytics = analyticsRepo.getAnalytics()
+                _uiState.update {
+                    it.copy(
+                        outfitCount = analytics.outfitCount,
+                        utilizationPct = analytics.utilizationPct,
+                        topColors = analytics.topColors,
+                        categoryBreakdown = analytics.categoryBreakdown,
+                        smartCategories = analytics.smartCategories,
+                        aiSuggestion = analytics.aiSuggestion.takeIf { s -> s.isNotBlank() },
+                    )
+                }
+            } catch (_: Exception) { /* offline — keep local data */ }
+        }
+    }
+
+    fun onSearchQuery(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
+        searchJob?.cancel()
+        if (query.isBlank()) {
+            applyFilterAndSearch()
+            return
+        }
+        searchJob = viewModelScope.launch {
+            delay(350) // debounce
+            try {
+                val matchingIds = analyticsRepo.search(query).toSet()
+                val filtered = _uiState.value.allItems.filter { it.id in matchingIds }
+                _uiState.update { it.copy(filteredItems = filtered) }
+            } catch (_: Exception) {
+                // Fallback to local text match
+                val q = query.lowercase()
+                val local = _uiState.value.allItems.filter { item ->
+                    listOfNotNull(item.category, item.subcategory, item.colorPrimary,
+                        item.colorSecondary, item.brand, item.pattern, item.formality)
+                        .any { it.lowercase().contains(q) }
+                }
+                _uiState.update { it.copy(filteredItems = local) }
             }
         }
     }
 
-    fun submitClarification(id: String, material: String?, fit: String?) {
+    fun selectFilter(filter: String) {
+        _uiState.update { it.copy(activeFilter = filter) }
         viewModelScope.launch {
-            wardrobeRepository.saveClarification(id, material, fit)
-            _uiState.update { it.copy(pendingClarificationItem = null) }
+            if (filter == "All") {
+                applyFilterAndSearch()
+            } else {
+                try {
+                    val matchingIds = analyticsRepo.filter(category = filter.lowercase()).toSet()
+                    val filtered = _uiState.value.allItems.filter { it.id in matchingIds }
+                    _uiState.update { it.copy(filteredItems = filtered) }
+                } catch (_: Exception) {
+                    applyFilterAndSearch()
+                }
+            }
         }
     }
 
-    fun dismissClarification() = _uiState.update { it.copy(pendingClarificationItem = null) }
+    fun selectSmartCategory(label: String) {
+        viewModelScope.launch {
+            val smartCat = _uiState.value.smartCategories.firstOrNull { it.label == label }
+            if (smartCat != null) {
+                val ids = smartCat.itemIds.toSet()
+                val filtered = _uiState.value.allItems.filter { it.id in ids }
+                _uiState.update { it.copy(filteredItems = filtered, activeFilter = label) }
+            }
+        }
+    }
+
+    private fun applyFilterAndSearch() {
+        val state = _uiState.value
+        var items = state.allItems
+        if (state.activeFilter != "All") {
+            val filter = state.activeFilter.lowercase()
+            items = items.filter { item ->
+                listOfNotNull(item.category, item.subcategory)
+                    .any { it.lowercase().contains(filter) }
+            }
+        }
+        if (state.searchQuery.isNotBlank()) {
+            val q = state.searchQuery.lowercase()
+            items = items.filter { item ->
+                listOfNotNull(item.category, item.subcategory, item.colorPrimary,
+                    item.colorSecondary, item.brand, item.pattern, item.formality)
+                    .any { it.lowercase().contains(q) }
+            }
+        }
+        _uiState.update { it.copy(filteredItems = items) }
+    }
+
+    fun clearSnack() = _uiState.update { it.copy(snackMessage = null) }
 }

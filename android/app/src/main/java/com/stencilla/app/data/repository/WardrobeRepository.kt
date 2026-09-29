@@ -22,7 +22,17 @@ class WardrobeRepository @Inject constructor(
     fun observeItems(): Flow<List<ClothingItemEntity>> = dao.observeAll()
     fun observeByCategory(category: String): Flow<List<ClothingItemEntity>> = dao.observeByCategory(category)
 
-    suspend fun addItem(context: Context, imageUri: Uri): ClothingItemEntity {
+    suspend fun addItem(
+        context: Context,
+        imageUri: Uri,
+        brand: String?,
+        size: String?,
+        condition: String?,
+        availability: String,
+        laundryState: String,
+        repairNote: String?,
+        purchasePriceCents: Int? = null,
+    ): ClothingItemEntity {
         val localFile = ImageFileUtil.copyToInternalStorage(context, imageUri)
         val roughLabel = onDeviceLabeler.labelImage(context, imageUri)
 
@@ -32,10 +42,24 @@ class WardrobeRepository @Inject constructor(
             localImagePath = localFile.absolutePath,
             onDeviceLabel = roughLabel,
             aiTagged = false,
+            brand = brand?.trim()?.takeIf { it.isNotEmpty() },
+            size = size?.trim()?.takeIf { it.isNotEmpty() },
+            condition = condition?.trim()?.takeIf { it.isNotEmpty() },
+            availability = availability,
+            laundryState = laundryState,
+            repairNote = repairNote?.trim()?.takeIf { it.isNotEmpty() },
+            purchasePriceCents = purchasePriceCents,
         )
         dao.insert(entity)
 
-        val tags = api.tagClothingItem(ImageFileUtil.fileToMultipart(localFile))
+        val tags = try {
+            api.tagClothingItem(ImageFileUtil.fileToMultipart(localFile))
+        } catch (error: Exception) {
+            // A failed one-shot upload must not leave an untracked wardrobe photo behind.
+            localFile.delete()
+            dao.delete(entity)
+            throw error
+        }
 
         entity = entity.copy(
             category = tags.category,
@@ -72,4 +96,6 @@ class WardrobeRepository @Inject constructor(
         File(item.localImagePath).delete()
         dao.delete(item)
     }
+
+    suspend fun setFavorite(item: ClothingItemEntity) = dao.setFavorite(item.id, !item.isFavorite)
 }
